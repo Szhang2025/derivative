@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Function & Derivative Plotter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+
+        .input-section {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .range-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .range-input {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .range-input input {
+            width: 100%;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 30px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #c33;
+            display: none;
+        }
+
+        .interpretation {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #4caf50;
+            display: none;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .interpretation strong {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .examples {
+            background: #f0f4ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+
+        .examples strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .examples code {
+            background: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin: 0 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Function & Derivative Plotter</h1>
+        <p class="subtitle">Visualize any single-variable function and its derivative</p>
+
+        <div class="input-section">
+            <label for="functionInput">Enter function f(x):</label>
+            <input type="text" id="functionInput" placeholder="e.g., x^2, sin(x), x^3 - 2*x" value="x^2">
+        </div>
+
+        <div class="range-inputs">
+            <div class="range-input">
+                <label for="xMin">X min:</label>
+                <input type="text" id="xMin" value="-5">
+            </div>
+            <div class="range-input">
+                <label for="xMax">X max:</label>
+                <input type="text" id="xMax" value="5">
+            </div>
+        </div>
+
+        <button onclick="plotFunction()">Plot Function</button>
+
+        <div class="interpretation" id="interpretationMsg"></div>
+        <div class="error" id="errorMsg"></div>
+
+        <div class="examples">
+            <strong>Example functions (smart notation supported!):</strong>
+            <code>x^2</code>
+            <code>sinx</code>
+            <code>3tanx</code>
+            <code>xsinx</code>
+            <code>xcosx</code>
+            <code>2sin(x)</code>
+            <code>(x+1)(x-1)</code>
+            <code>(x-cosx)^(1/3)</code>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let myChart = null;
+
+        function preprocessFunction(input) {
+            let processed = input.trim();
+            
+            // List of known function names
+            const functions = ['sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'ln', 'log', 'exp', 'sqrt', 'abs', 'asin', 'acos', 'atan'];
+            
+            // Step 1: Convert function names without parentheses to have them
+            // e.g., sinx -> sin(x), cosx -> cos(x), tanx -> tan(x)
+            for (let func of functions) {
+                // Match function followed by single letter (not part of another word)
+                let regex = new RegExp('\\b' + func + '\\s*([a-z])(?![a-z])', 'gi');
+                processed = processed.replace(regex, func + '($1)');
+            }
+            
+            // Step 2: Add multiplication operators where needed
+            let result = '';
+            for (let i = 0; i < processed.length; i++) {
+                let curr = processed[i];
+                let next = processed[i + 1];
+                
+                result += curr;
+                
+                // Skip if current or next is whitespace
+                if (!next || curr === ' ' || next === ' ') continue;
+                
+                // Skip if next char is already an operator
+                if (next === '*' || next === '/' || next === '+' || next === '-' || next === '^') continue;
+                
+                // Skip if current char is an operator
+                if (curr === '*' || curr === '/' || curr === '+' || curr === '-' || curr === '^') continue;
+                
+                // Check if we're at the end of a function name (followed by opening paren)
+                // If so, don't add multiplication
+                let atFunctionCall = false;
+                if (next === '(') {
+                    // Look back to see if we just finished a function name
+                    for (let func of functions) {
+                        if (result.toLowerCase().endsWith(func)) {
+                            atFunctionCall = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // Check if next characters form a function name
+                let nextIsFunction = false;
+                if (/[a-z]/i.test(next)) {
+                    for (let func of functions) {
+                        let substring = processed.substring(i + 1, i + 1 + func.length);
+                        if (substring.toLowerCase() === func.toLowerCase()) {
+                            nextIsFunction = true;
+                            break;
+                        }
+                    }
+                }
+                
+                let needsMult = false;
+                
+                // Digit followed by letter: 2x -> 2*x (but NOT if letter starts a function name like 2sin)
+                if (/[0-9]/.test(curr) && /[a-z]/i.test(next) && !nextIsFunction) {
+                    needsMult = true;
+                }
+                // Letter followed by digit: x2 -> x*2
+                else if (/[a-z]/i.test(curr) && /[0-9]/.test(next)) {
+                    needsMult = true;
+                }
+                // Digit followed by function name: 2sin -> 2*sin
+                else if (/[0-9]/.test(curr) && nextIsFunction) {
+                    needsMult = true;
+                }
+                // Digit or letter followed by opening paren: 2( -> 2*(, x( -> x*(
+                // BUT NOT if it's a function call
+                else if ((/[0-9a-z]/i.test(curr)) && next === '(' && !atFunctionCall) {
+                    needsMult = true;
+                }
+                // Closing paren followed by digit or letter: )x -> )*x, )2 -> )*2
+                else if (curr === ')' && /[0-9a-z]/i.test(next)) {
+                    needsMult = true;
+                }
+                // Closing paren followed by opening paren: )( -> )*(
+                else if (curr === ')' && next === '(') {
+                    needsMult = true;
+                }
+                
+                if (needsMult) {
+                    result += '*';
+                }
+            }
+            
+            return result;
+        }
+
+        function plotFunction() {
+            const rawInput = document.getElementById('functionInput').value;
+            const functionInput = preprocessFunction(rawInput);
+            const xMin = parseFloat(document.getElementById('xMin').value);
+            const xMax = parseFloat(document.getElementById('xMax').value);
+            const errorMsg = document.getElementById('errorMsg');
+            const interpretationMsg = document.getElementById('interpretationMsg');
+
+            // Clear previous messages
+            errorMsg.style.display = 'none';
+            interpretationMsg.style.display = 'none';
+
+            // Show interpretation and ask for confirmation if input was modified
+            if (rawInput !== functionInput) {
+                const confirmed = confirm(
+                    `Your input: ${rawInput}\n\n` +
+                    `Will be interpreted as: ${functionInput}\n\n` +
+                    `Is this correct?`
+                );
+                
+                if (!confirmed) {
+                    errorMsg.textContent = 'Plot cancelled. Please modify your input and try again.';
+                    errorMsg.style.display = 'block';
+                    return;
+                }
+                
+                interpretationMsg.innerHTML = `<strong>Interpreted as:</strong> ${functionInput}`;
+                interpretationMsg.style.display = 'block';
+            }
+
+            try {
+                // Validate inputs
+                if (isNaN(xMin) || isNaN(xMax)) {
+                    throw new Error('Please enter valid numbers for X range');
+                }
+                if (xMin >= xMax) {
+                    throw new Error('X min must be less than X max');
+                }
+
+                // Parse the function
+                const node = math.parse(functionInput);
+                const compiled = node.compile();
+
+                // Calculate derivative
+                const derivative = math.derivative(functionInput, 'x');
+                const derivativeCompiled = derivative.compile();
+
+                // Generate x values
+                const numPoints = 200;
+                const step = (xMax - xMin) / numPoints;
+                const xValues = [];
+                const yValues = [];
+                const yDerivativeValues = [];
+
+                for (let i = 0; i <= numPoints; i++) {
+                    const x = xMin + i * step;
+                    xValues.push(x);
+
+                    try {
+                        const y = compiled.evaluate({ x: x });
+                        // Check if result is a valid real number
+                        if (typeof y === 'number' && isFinite(y)) {
+                            yValues.push(y);
+                        } else if (y && typeof y === 'object' && 're' in y) {
+                            // Handle complex numbers - only plot if imaginary part is negligible
+                            if (Math.abs(y.im) < 1e-10 && isFinite(y.re)) {
+                                yValues.push(y.re);
+                            } else {
+                                yValues.push(null);
+                            }
+                        } else {
+                            yValues.push(null);
+                        }
+                    } catch (e) {
+                        yValues.push(null);
+                    }
+
+                    try {
+                        const yDeriv = derivativeCompiled.evaluate({ x: x });
+                        // Check if result is a valid real number
+                        if (typeof yDeriv === 'number' && isFinite(yDeriv)) {
+                            yDerivativeValues.push(yDeriv);
+                        } else if (yDeriv && typeof yDeriv === 'object' && 're' in yDeriv) {
+                            // Handle complex numbers - only plot if imaginary part is negligible
+                            if (Math.abs(yDeriv.im) < 1e-10 && isFinite(yDeriv.re)) {
+                                yDerivativeValues.push(yDeriv.re);
+                            } else {
+                                yDerivativeValues.push(null);
+                            }
+                        } else {
+                            yDerivativeValues.push(null);
+                        }
+                    } catch (e) {
+                        yDerivativeValues.push(null);
+                    }
+                }
+
+                // Destroy previous chart if exists
+                if (myChart) {
+                    myChart.destroy();
+                }
+
+                // Create new chart
+                const ctx = document.getElementById('myChart').getContext('2d');
+                myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: xValues,
+                        datasets: [
+                            {
+                                label: `f(x) = ${rawInput}`,
+                                data: yValues,
+                                borderColor: 'rgb(102, 126, 234)',
+                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                tension: 0.1,
+                                spanGaps: false
+                            },
+                            {
+                                label: `f'(x) = ${derivative.toString()}`,
+                                data: yDerivativeValues,
+                                borderColor: 'rgb(118, 75, 162)',
+                                backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                tension: 0.1,
+                                spanGaps: false
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                title: {
+                                    display: true,
+                                    text: 'x'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return value.toFixed(1);
+                                    }
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'y'
+                                }
+                            }
+                        },
+                        interaction: {
+                            mode: 'nearest',
+                            axis: 'x',
+                            intersect: false
+                        }
+                    }
+                });
+
+            } catch (error) {
+                errorMsg.textContent = `Error: ${error.message}`;
+                errorMsg.style.display = 'block';
+                console.error(error);
+            }
+        }
+
+        // Plot initial function on load
+        window.onload = function() {
+            plotFunction();
+        };
+    </script>
+</body>
+</html>
